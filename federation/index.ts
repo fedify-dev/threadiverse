@@ -8,6 +8,7 @@ import {
 } from "@fedify/fedify";
 import {
   Accept,
+  Activity,
   Announce,
   Create,
   Endpoints,
@@ -258,6 +259,12 @@ federation
       }),
       { preferSharedInbox: true },
     );
+  })
+  .on(Announce, async (ctx, announce) => {
+    const object = await announce.getObject(ctx);
+    if (object instanceof Activity) {
+      await ctx.routeActivity(ctx.recipient, object);
+    }
   });
 
 export default federation;
