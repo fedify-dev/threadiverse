@@ -14,12 +14,13 @@ import {
   Endpoints,
   Follow,
   Group,
+  Note,
   Page,
   Person,
   PUBLIC_COLLECTION,
 } from "@fedify/vocab";
 import { and, eq } from "drizzle-orm";
-import { communities, db, follows, keys, threads, users } from "@/db";
+import { communities, db, follows, keys, replies, threads, users } from "@/db";
 
 const federation = createFederation({
   kv: new MemoryKvStore(),
@@ -215,25 +216,61 @@ federation
   .on(Create, async (ctx, create) => {
     if (!create.actorId) return;
     const object = await create.getObject(ctx);
-    if (!(object instanceof Page)) return;
-    if (!object.id) return;
+    if (!object?.id) return;
 
-    const communityUri = object.audienceId ?? create.toIds[0];
-    if (!communityUri) return;
+    let communityUri: URL | null = null;
 
-    db.insert(threads)
-      .values({
-        uri: object.id.href,
-        communityUri: communityUri.href,
-        authorUri: create.actorId.href,
-        title: object.name?.toString() ?? "(untitled)",
-        content: object.content?.toString() ?? "",
-        createdAt: object.published
-          ? new Date(object.published.epochMilliseconds)
-          : new Date(),
-      })
-      .onConflictDoNothing()
-      .run();
+    if (object instanceof Page) {
+      communityUri = object.audienceId ?? create.toIds[0] ?? null;
+      if (!communityUri) return;
+      db.insert(threads)
+        .values({
+          uri: object.id.href,
+          communityUri: communityUri.href,
+          authorUri: create.actorId.href,
+          title: object.name?.toString() ?? "(untitled)",
+          content: object.content?.toString() ?? "",
+          createdAt: object.published
+            ? new Date(object.published.epochMilliseconds)
+            : new Date(),
+        })
+        .onConflictDoNothing()
+        .run();
+    } else if (object instanceof Note) {
+      communityUri = object.audienceId ?? create.toIds[0] ?? null;
+      const inReplyTo = object.replyTargetId;
+      if (!communityUri || !inReplyTo) return;
+      const parentThread = db
+        .select({ uri: threads.uri })
+        .from(threads)
+        .where(eq(threads.uri, inReplyTo.href))
+        .get();
+      const parentReply = parentThread
+        ? null
+        : db
+            .select({ uri: replies.uri, threadUri: replies.threadUri })
+            .from(replies)
+            .where(eq(replies.uri, inReplyTo.href))
+            .get();
+      const threadUri = parentThread?.uri ?? parentReply?.threadUri;
+      if (!threadUri) return;
+      db.insert(replies)
+        .values({
+          uri: object.id.href,
+          threadUri,
+          parentUri: parentReply ? inReplyTo.href : null,
+          communityUri: communityUri.href,
+          authorUri: create.actorId.href,
+          content: object.content?.toString() ?? "",
+          createdAt: object.published
+            ? new Date(object.published.epochMilliseconds)
+            : new Date(),
+        })
+        .onConflictDoNothing()
+        .run();
+    } else {
+      return;
+    }
 
     const parsed = ctx.parseUri(communityUri);
     if (parsed?.type !== "actor") return;
