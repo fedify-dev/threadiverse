@@ -65,3 +65,23 @@ export const communities = sqliteTable("communities", {
 
 export type Community = typeof communities.$inferSelect;
 export type NewCommunity = typeof communities.$inferInsert;
+
+export const follows = sqliteTable(
+  "follows",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    followerUri: text("follower_uri").notNull(),
+    followerInbox: text("follower_inbox").notNull(),
+    followerSharedInbox: text("follower_shared_inbox"),
+    followedUri: text("followed_uri").notNull(),
+    accepted: integer("accepted", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [
+    uniqueIndex("follows_pair_idx").on(table.followerUri, table.followedUri),
+  ],
+);
+
+export type Follow = typeof follows.$inferSelect;

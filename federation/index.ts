@@ -8,7 +8,7 @@ import {
 } from "@fedify/fedify";
 import { Endpoints, Group, Person } from "@fedify/vocab";
 import { and, eq } from "drizzle-orm";
-import { communities, db, keys, users } from "@/db";
+import { communities, db, follows, keys, users } from "@/db";
 
 const federation = createFederation({
   kv: new MemoryKvStore(),
@@ -50,6 +50,7 @@ federation
         summary: community.description || undefined,
         inbox: ctx.getInboxUri(identifier),
         endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
+        followers: ctx.getFollowersUri(identifier),
         url: new URL(`/users/${identifier}`, ctx.url),
         publicKey: keyPairs[0]?.cryptographicKey,
         assertionMethods: keyPairs.map((k) => k.multikey),
@@ -105,6 +106,37 @@ federation
     }
     return pairs;
   });
+
+federation.setFollowersDispatcher(
+  "/users/{identifier}/followers",
+  async (ctx, identifier) => {
+    const community = db
+      .select()
+      .from(communities)
+      .where(eq(communities.slug, identifier))
+      .get();
+    if (!community) return null;
+    const rows = db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followedUri, ctx.getActorUri(identifier).href),
+          eq(follows.accepted, true),
+        ),
+      )
+      .all();
+    return {
+      items: rows.map((r) => ({
+        id: new URL(r.followerUri),
+        inboxId: new URL(r.followerInbox),
+        endpoints: r.followerSharedInbox
+          ? { sharedInbox: new URL(r.followerSharedInbox) }
+          : null,
+      })),
+    };
+  },
+);
 
 federation.setInboxListeners("/users/{identifier}/inbox", "/inbox");
 
