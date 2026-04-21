@@ -1,6 +1,9 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { communities, db, users } from "@/db";
+import { communities, db, threads, users } from "@/db";
+import { currentOrigin } from "@/lib/origin";
+import { getCurrentUser } from "@/lib/session";
 
 type ProfilePageProps = {
   params: Promise<{ username: string }>;
@@ -41,6 +44,22 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     .where(eq(communities.slug, identifier))
     .get();
   if (community) {
+    const currentUser = await getCurrentUser();
+    const origin = await currentOrigin();
+    const communityUri = new URL(`/users/${identifier}`, origin).href;
+    const threadRows = db
+      .select({
+        id: threads.id,
+        uri: threads.uri,
+        title: threads.title,
+        authorUri: threads.authorUri,
+        createdAt: threads.createdAt,
+      })
+      .from(threads)
+      .where(eq(threads.communityUri, communityUri))
+      .orderBy(desc(threads.createdAt))
+      .all();
+
     return (
       <>
         <h1>!{community.slug}</h1>
@@ -54,7 +73,32 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             day: "numeric",
           })}
         </p>
-        <p>Threads posted in this community will appear here.</p>
+        {currentUser && (
+          <p>
+            <Link
+              href={`/users/${community.slug}/new-thread`}
+              className="button"
+            >
+              Start a thread
+            </Link>
+          </p>
+        )}
+        <h3>Threads</h3>
+        {threadRows.length === 0 ? (
+          <p className="muted">No threads yet. Be the first.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {threadRows.map((t) => (
+              <li key={t.id} className="card">
+                <h4 style={{ margin: 0 }}>{t.title}</h4>
+                <p className="muted">
+                  Posted {t.createdAt.toLocaleDateString("en-US")} by{" "}
+                  <code>{t.authorUri}</code>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </>
     );
   }
