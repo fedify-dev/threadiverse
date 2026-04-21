@@ -2,6 +2,7 @@ import {
   createFederation,
   exportJwk,
   generateCryptoKeyPair,
+  getDocumentLoader,
   type InboxContext,
   InProcessMessageQueue,
   importJwk,
@@ -34,10 +35,30 @@ import {
   users,
   votes,
 } from "@/db";
+import lemmyContext from "./lemmy-context.json" with { type: "json" };
+
+const BUNDLED_CONTEXTS: Record<string, unknown> = {
+  "https://join-lemmy.org/context.json": lemmyContext,
+};
+
+const documentLoaderFactory: Parameters<
+  typeof createFederation
+>[0]["documentLoaderFactory"] = (options) => {
+  const inner = getDocumentLoader(options);
+  return async (url) => {
+    const bundled = BUNDLED_CONTEXTS[url];
+    if (bundled != null) {
+      return { contextUrl: null, document: bundled, documentUrl: url };
+    }
+    return await inner(url);
+  };
+};
 
 const federation = createFederation({
   kv: new MemoryKvStore(),
   queue: new InProcessMessageQueue(),
+  documentLoaderFactory,
+  contextLoaderFactory: documentLoaderFactory,
 });
 
 federation
@@ -141,7 +162,7 @@ federation.setOutboxDispatcher(
   async (_ctx, _identifier) => ({ items: [] }),
 );
 
-federation.setCollectionDispatcher(
+federation.setOrderedCollectionDispatcher(
   "moderators",
   Person,
   "/users/{identifier}/moderators",
@@ -236,11 +257,15 @@ federation
       actor,
       new Accept({
         id: new URL(
-          `#accepts/${encodeURIComponent(follow.id.href)}`,
-          follow.objectId,
+          `/users/${identifier}/accepts/${crypto.randomUUID()}`,
+          ctx.getActorUri(identifier),
         ),
         actor: follow.objectId,
-        object: follow,
+        object: new Follow({
+          id: follow.id,
+          actor: follow.actorId,
+          object: follow.objectId,
+        }),
       }),
     );
   })
@@ -353,7 +378,7 @@ federation
         tos: [ctx.getFollowersUri(parsed.identifier)],
         ccs: [PUBLIC_COLLECTION],
       }),
-      { preferSharedInbox: true },
+      { preferSharedInbox: false },
     );
   })
   .on(Announce, async (ctx, announce) => {

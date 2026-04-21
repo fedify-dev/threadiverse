@@ -2,6 +2,7 @@ import { integrateFederation, isFederationRequest } from "@fedify/next";
 import { NextResponse } from "next/server";
 import { getXForwardedRequest } from "x-forwarded-fetch";
 import federation from "./federation";
+import "./logging";
 
 const federationHandler = integrateFederation(federation);
 
