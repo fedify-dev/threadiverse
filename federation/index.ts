@@ -383,13 +383,13 @@ federation
       "followers",
       new Announce({
         id: new URL(
-          `#announce/${encodeURIComponent(object.id.href)}`,
-          communityUri,
+          `/users/${parsed.identifier}/announces/${crypto.randomUUID()}`,
+          ctx.getActorUri(parsed.identifier),
         ),
         actor: communityUri,
         object: create,
-        tos: [ctx.getFollowersUri(parsed.identifier)],
-        ccs: [PUBLIC_COLLECTION],
+        tos: [PUBLIC_COLLECTION],
+        ccs: [ctx.getFollowersUri(parsed.identifier)],
       }),
       { preferSharedInbox: false },
     );
