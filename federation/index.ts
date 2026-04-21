@@ -21,6 +21,7 @@ import {
   Page,
   Person,
   PUBLIC_COLLECTION,
+  Undo,
 } from "@fedify/vocab";
 import { and, eq } from "drizzle-orm";
 import {
@@ -217,6 +218,20 @@ federation
     if (!enclosed.actorId || !enclosed.objectId) return;
     db.update(follows)
       .set({ accepted: true })
+      .where(
+        and(
+          eq(follows.followerUri, enclosed.actorId.href),
+          eq(follows.followedUri, enclosed.objectId.href),
+        ),
+      )
+      .run();
+  })
+  .on(Undo, async (ctx, undo) => {
+    const enclosed = await undo.getObject(ctx);
+    if (!(enclosed instanceof Follow)) return;
+    if (!enclosed.actorId || !enclosed.objectId) return;
+    if (undo.actorId?.href !== enclosed.actorId.href) return;
+    db.delete(follows)
       .where(
         and(
           eq(follows.followerUri, enclosed.actorId.href),

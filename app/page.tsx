@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { db, follows, threads } from "@/db";
 import { currentOrigin } from "@/lib/origin";
 import { getCurrentUser } from "@/lib/session";
+import { unfollowCommunity } from "./unfollow/actions";
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -27,11 +28,16 @@ export default async function Home() {
   const viewerUri = new URL(`/users/${user.username}`, origin).href;
 
   const subscribed = db
-    .select({ followedUri: follows.followedUri })
+    .select({
+      followedUri: follows.followedUri,
+      accepted: follows.accepted,
+    })
     .from(follows)
-    .where(and(eq(follows.followerUri, viewerUri), eq(follows.accepted, true)))
+    .where(eq(follows.followerUri, viewerUri))
     .all();
-  const subscribedUris = subscribed.map((r) => r.followedUri);
+  const subscribedUris = subscribed
+    .filter((r) => r.accepted)
+    .map((r) => r.followedUri);
 
   const feed =
     subscribedUris.length === 0
@@ -47,6 +53,43 @@ export default async function Home() {
   return (
     <>
       <h1>Your feed</h1>
+      {subscribed.length > 0 && (
+        <section>
+          <h3>Subscriptions</h3>
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {subscribed.map((row) => (
+              <li
+                key={row.followedUri}
+                style={{
+                  display: "flex",
+                  gap: "0.75rem",
+                  alignItems: "center",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                <code>{row.followedUri}</code>
+                <span className="muted">
+                  {row.accepted ? "" : "(pending) "}
+                </span>
+                <form action={unfollowCommunity}>
+                  <input
+                    type="hidden"
+                    name="followedUri"
+                    value={row.followedUri}
+                  />
+                  <button
+                    type="submit"
+                    className="link-button"
+                    style={{ margin: 0 }}
+                  >
+                    Unfollow
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {subscribedUris.length === 0 ? (
         <p className="muted">
           You don't subscribe to any communities yet.{" "}
