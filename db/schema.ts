@@ -1,5 +1,10 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -25,3 +30,22 @@ export const sessions = sqliteTable("sessions", {
 });
 
 export type Session = typeof sessions.$inferSelect;
+
+export const keys = sqliteTable(
+  "keys",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    actorIdentifier: text("actor_identifier").notNull(),
+    type: text("type", { enum: ["RSASSA-PKCS1-v1_5", "Ed25519"] }).notNull(),
+    privateKey: text("private_key").notNull(),
+    publicKey: text("public_key").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [
+    uniqueIndex("keys_actor_type_idx").on(table.actorIdentifier, table.type),
+  ],
+);
+
+export type Key = typeof keys.$inferSelect;
