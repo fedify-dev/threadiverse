@@ -4,9 +4,6 @@ import {
   MemoryKvStore,
 } from "@fedify/fedify";
 import { Person } from "@fedify/vocab";
-import { getLogger } from "@logtape/logtape";
-
-const logger = getLogger("threadiverse");
 
 const federation = createFederation({
   kv: new MemoryKvStore(),

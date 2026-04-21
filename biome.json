@@ -7,6 +7,10 @@
     "indentWidth": 2
   },
   "linter": {
-    "enabled": false
+    "enabled": true,
+    "rules": { "recommended": true }
+  },
+  "files": {
+    "includes": ["**", "!.next", "!node_modules", "!public"]
   }
 }

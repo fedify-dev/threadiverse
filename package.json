@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "biome check",
+    "format": "biome check --write"
   },
   "dependencies": {
     "next": "^15.5.15",
@@ -21,11 +22,8 @@
     "@types/node": "^20.11.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "^15.5.15",
     "typescript": "^5",
-    "@biomejs/biome": "^2.2.4",
-    "@fedify/lint": "2.1.7"
+    "@biomejs/biome": "^2.2.4"
   },
   "type": "module"
 }
