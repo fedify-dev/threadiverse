@@ -6,9 +6,9 @@ import {
   importJwk,
   MemoryKvStore,
 } from "@fedify/fedify";
-import { Endpoints, Person } from "@fedify/vocab";
+import { Endpoints, Group, Person } from "@fedify/vocab";
 import { and, eq } from "drizzle-orm";
-import { db, keys, users } from "@/db";
+import { communities, db, keys, users } from "@/db";
 
 const federation = createFederation({
   kv: new MemoryKvStore(),
@@ -22,19 +22,41 @@ federation
       .from(users)
       .where(eq(users.username, identifier))
       .get();
-    if (!user) return null;
+    if (user) {
+      const keyPairs = await ctx.getActorKeyPairs(identifier);
+      return new Person({
+        id: ctx.getActorUri(identifier),
+        preferredUsername: identifier,
+        name: identifier,
+        inbox: ctx.getInboxUri(identifier),
+        endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
+        url: new URL(`/users/${identifier}`, ctx.url),
+        publicKey: keyPairs[0]?.cryptographicKey,
+        assertionMethods: keyPairs.map((k) => k.multikey),
+      });
+    }
 
-    const keyPairs = await ctx.getActorKeyPairs(identifier);
-    return new Person({
-      id: ctx.getActorUri(identifier),
-      preferredUsername: identifier,
-      name: identifier,
-      inbox: ctx.getInboxUri(identifier),
-      endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
-      url: new URL(`/users/${identifier}`, ctx.url),
-      publicKey: keyPairs[0]?.cryptographicKey,
-      assertionMethods: keyPairs.map((k) => k.multikey),
-    });
+    const community = db
+      .select()
+      .from(communities)
+      .where(eq(communities.slug, identifier))
+      .get();
+    if (community) {
+      const keyPairs = await ctx.getActorKeyPairs(identifier);
+      return new Group({
+        id: ctx.getActorUri(identifier),
+        preferredUsername: identifier,
+        name: community.name,
+        summary: community.description || undefined,
+        inbox: ctx.getInboxUri(identifier),
+        endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
+        url: new URL(`/users/${identifier}`, ctx.url),
+        publicKey: keyPairs[0]?.cryptographicKey,
+        assertionMethods: keyPairs.map((k) => k.multikey),
+      });
+    }
+
+    return null;
   })
   .setKeyPairsDispatcher(async (_ctx, identifier) => {
     const user = db
@@ -42,7 +64,14 @@ federation
       .from(users)
       .where(eq(users.username, identifier))
       .get();
-    if (!user) return [];
+    const community = user
+      ? null
+      : db
+          .select({ id: communities.id })
+          .from(communities)
+          .where(eq(communities.slug, identifier))
+          .get();
+    if (!user && !community) return [];
 
     const pairs: CryptoKeyPair[] = [];
     for (const keyType of ["RSASSA-PKCS1-v1_5", "Ed25519"] as const) {
