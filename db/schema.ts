@@ -100,3 +100,19 @@ export const threads = sqliteTable("threads", {
 
 export type Thread = typeof threads.$inferSelect;
 export type NewThread = typeof threads.$inferInsert;
+
+export const replies = sqliteTable("replies", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  uri: text("uri").notNull().unique(),
+  threadUri: text("thread_uri").notNull(),
+  parentUri: text("parent_uri"),
+  communityUri: text("community_uri").notNull(),
+  authorUri: text("author_uri").notNull(),
+  content: text("content").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+export type Reply = typeof replies.$inferSelect;
+export type NewReply = typeof replies.$inferInsert;
