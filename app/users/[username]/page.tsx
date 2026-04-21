@@ -90,7 +90,11 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           <ul style={{ listStyle: "none", padding: 0 }}>
             {threadRows.map((t) => (
               <li key={t.id} className="card">
-                <h4 style={{ margin: 0 }}>{t.title}</h4>
+                <h4 style={{ margin: 0 }}>
+                  <Link href={`/users/${community.slug}/threads/${t.id}`}>
+                    {t.title}
+                  </Link>
+                </h4>
                 <p className="muted">
                   Posted {t.createdAt.toLocaleDateString("en-US")} by{" "}
                   <code>{t.authorUri}</code>
