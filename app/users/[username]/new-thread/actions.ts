@@ -1,6 +1,6 @@
 "use server";
 
-import { Create, isActor, Page, PUBLIC_COLLECTION } from "@fedify/vocab";
+import { Create, Page, PUBLIC_COLLECTION } from "@fedify/vocab";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { communities, db, threads } from "@/db";
@@ -62,14 +62,13 @@ export async function createThread(
     ccs: [PUBLIC_COLLECTION, communityFollowersUri],
   });
 
-  const communityActor = await ctx.lookupObject(communityActorUri);
-  if (!isActor(communityActor)) {
-    redirect(`/users/${slug}?error=Could+not+resolve+community+actor`);
-  }
-
   await ctx.sendActivity(
     { identifier: user.username },
-    communityActor,
+    {
+      id: communityActorUri,
+      inboxId: ctx.getInboxUri(slug),
+      endpoints: { sharedInbox: ctx.getInboxUri() },
+    },
     new Create({
       id: new URL("#create", threadUri),
       actor: authorUri,

@@ -6,9 +6,19 @@ import {
   importJwk,
   MemoryKvStore,
 } from "@fedify/fedify";
-import { Accept, Endpoints, Follow, Group, Person } from "@fedify/vocab";
+import {
+  Accept,
+  Announce,
+  Create,
+  Endpoints,
+  Follow,
+  Group,
+  Page,
+  Person,
+  PUBLIC_COLLECTION,
+} from "@fedify/vocab";
 import { and, eq } from "drizzle-orm";
-import { communities, db, follows, keys, users } from "@/db";
+import { communities, db, follows, keys, threads, users } from "@/db";
 
 const federation = createFederation({
   kv: new MemoryKvStore(),
@@ -200,6 +210,54 @@ federation
         ),
       )
       .run();
+  })
+  .on(Create, async (ctx, create) => {
+    if (!create.actorId) return;
+    const object = await create.getObject(ctx);
+    if (!(object instanceof Page)) return;
+    if (!object.id) return;
+
+    const communityUri = object.audienceId ?? create.toIds[0];
+    if (!communityUri) return;
+
+    db.insert(threads)
+      .values({
+        uri: object.id.href,
+        communityUri: communityUri.href,
+        authorUri: create.actorId.href,
+        title: object.name?.toString() ?? "(untitled)",
+        content: object.content?.toString() ?? "",
+        createdAt: object.published
+          ? new Date(object.published.epochMilliseconds)
+          : new Date(),
+      })
+      .onConflictDoNothing()
+      .run();
+
+    const parsed = ctx.parseUri(communityUri);
+    if (parsed?.type !== "actor") return;
+    const localCommunity = db
+      .select({ slug: communities.slug })
+      .from(communities)
+      .where(eq(communities.slug, parsed.identifier))
+      .get();
+    if (!localCommunity) return;
+
+    await ctx.sendActivity(
+      { identifier: parsed.identifier },
+      "followers",
+      new Announce({
+        id: new URL(
+          `#announce/${encodeURIComponent(object.id.href)}`,
+          communityUri,
+        ),
+        actor: communityUri,
+        object: create,
+        tos: [ctx.getFollowersUri(parsed.identifier)],
+        ccs: [PUBLIC_COLLECTION],
+      }),
+      { preferSharedInbox: true },
+    );
   });
 
 export default federation;
