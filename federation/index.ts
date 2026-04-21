@@ -54,6 +54,7 @@ federation
         preferredUsername: identifier,
         name: identifier,
         inbox: ctx.getInboxUri(identifier),
+        outbox: ctx.getOutboxUri(identifier),
         endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
         url: new URL(`/users/${identifier}`, ctx.url),
         publicKey: keyPairs[0]?.cryptographicKey,
@@ -74,6 +75,7 @@ federation
         name: community.name,
         summary: community.description || undefined,
         inbox: ctx.getInboxUri(identifier),
+        outbox: ctx.getOutboxUri(identifier),
         endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
         followers: ctx.getFollowersUri(identifier),
         url: new URL(`/users/${identifier}`, ctx.url),
@@ -131,6 +133,11 @@ federation
     }
     return pairs;
   });
+
+federation.setOutboxDispatcher(
+  "/users/{identifier}/outbox",
+  async (_ctx, _identifier) => ({ items: [] }),
+);
 
 federation.setFollowersDispatcher(
   "/users/{identifier}/followers",
