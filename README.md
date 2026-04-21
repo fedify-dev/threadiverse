@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Federated threadiverse example using Fedify and Next.js
+=======================================================
 
-## Getting Started
+> [!WARNING]
+> This program is for educational purposes only.  Do not use it for any
+> other purpose; it has not been tested for security or scale.
 
-First, run the development server:
+This is a small threadiverse-style community platform written against
+[Fedify] (the ActivityPub server framework) and [Next.js] (the web
+framework).  It pairs with the
+[*Building a threadiverse community platform*][tutorial] tutorial on
+fedify.dev—the commits in this repository correspond one-to-one with the
+tutorial's sections so you can `git checkout` any commit and see the state of
+the project at that step.
 
-```bash
+Features:
+
+ -  Users can sign up and log in with a username + password.
+ -  Local users are federated as `Person` actors with per-user key pairs.
+ -  Local users can create communities, federated as `Group` actors with
+    per-community key pairs, an inbox/outbox, and a followers collection.
+ -  Users can follow and unfollow any threadiverse-compatible community
+    (local or remote) using `Follow`/`Undo(Follow)`/`Accept(Follow)`.
+ -  Users can post text threads (`Create(Page)`) and replies
+    (`Create(Note)`).  Communities re-distribute everything they receive
+    to their followers as `Announce`.
+ -  Users can up-vote (`Like`) and down-vote (`Dislike`) threads and
+    replies; the community re-announces those too.
+ -  The home page is a subscribed feed of threads from every community
+    the viewer follows.
+
+As with any small educational example, many features of real
+threadiverse servers (Lemmy, Mbin, NodeBB) are left out intentionally:
+
+ -  No thread or reply editing or deletion
+    (`Update(Page)`/`Delete(Page)`/`Update(Note)`/`Delete(Note)`/`Tombstone`).
+ -  No link threads, just text threads.
+ -  No moderation (mod roles, removals, bans, reports).
+ -  No ranking algorithms (hot/active/scaled), just reverse
+    chronological.
+ -  No private communities, no media uploads, no DMs.
+ -  No Lemmy-specific extensions (`attributedTo`, `moderators`,
+    `featured`, `postingRestrictedToMods`).  Lemmy can dereference the
+    community actor and follow it, but it won't treat it as a full
+    Lemmy community.
+
+[Fedify]: https://fedify.dev/
+[Next.js]: https://nextjs.org/
+[tutorial]: https://fedify.dev/tutorial/threadiverse
+
+
+Dependencies
+------------
+
+This project is written in TypeScript and runs on [Node.js].  You
+need Node.js 22.0.0 or later.  Besides [Fedify] and [Next.js], the
+runtime dependencies are:
+
+ -  [Drizzle ORM] for database access.
+ -  [*better-sqlite3*] for the SQLite driver.
+ -  [*x-forwarded-fetch*] for honouring reverse-proxy headers.
+
+See *package.json* for the full list.
+
+[Node.js]: https://nodejs.org/
+[Drizzle ORM]: https://orm.drizzle.team/
+[*better-sqlite3*]: https://github.com/WiseLibs/better-sqlite3
+[*x-forwarded-fetch*]: https://github.com/dahlia/x-forwarded-fetch
+
+
+How to run
+----------
+
+Install dependencies:
+
+~~~~ sh
+npm install
+~~~~
+
+Create the SQLite database:
+
+~~~~ sh
+npm run db:push
+~~~~
+
+Start the Next.js development server:
+
+~~~~ sh
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+~~~~
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit <http://localhost:3000/> in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To federate with the rest of the fediverse, expose the server to the
+public internet.  The quickest way is a tunnel:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+~~~~ sh
+npx @fedify/cli tunnel 3000
+~~~~
 
-## Learn More
+See the [tunneling-services section of Fedify's manual][tunnels] for
+alternatives.
 
-To learn more about Next.js, take a look at the following resources:
+[tunnels]: https://fedify.dev/manual/test#exposing-a-local-server-to-the-public
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+License
+-------
 
-## Deploy on Vercel
+This program is licensed under the [MIT License].  See the *LICENSE*
+file for details.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT License]: https://minhee.mit-license.org/2026/
