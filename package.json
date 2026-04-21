@@ -29,6 +29,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
+    "server-only": "^0.0.1",
     "typescript": "^5"
   },
   "type": "module"

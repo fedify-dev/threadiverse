@@ -60,6 +60,29 @@ nav.site-nav ul {
   flex: 1;
 }
 
+nav.site-nav .session-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+nav.site-nav .link-button {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent);
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+nav.site-nav .link-button:hover {
+  background: transparent;
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
 main {
   max-width: 800px;
   margin: 0 auto;
