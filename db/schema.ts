@@ -116,3 +116,23 @@ export const replies = sqliteTable("replies", {
 
 export type Reply = typeof replies.$inferSelect;
 export type NewReply = typeof replies.$inferInsert;
+
+export const votes = sqliteTable(
+  "votes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    uri: text("uri").notNull().unique(),
+    voterUri: text("voter_uri").notNull(),
+    targetUri: text("target_uri").notNull(),
+    kind: text("kind", { enum: ["Like", "Dislike"] }).notNull(),
+    communityUri: text("community_uri").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [
+    uniqueIndex("votes_voter_target_idx").on(table.voterUri, table.targetUri),
+  ],
+);
+
+export type Vote = typeof votes.$inferSelect;

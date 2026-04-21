@@ -1,10 +1,11 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { communities, db, replies, threads } from "@/db";
+import { communities, db, replies, threads, votes } from "@/db";
 import { currentOrigin } from "@/lib/origin";
 import { getCurrentUser } from "@/lib/session";
 import { createReply } from "./actions";
+import { castVote } from "./vote-actions";
 
 type ThreadPageProps = {
   params: Promise<{ username: string; id: string }>;
@@ -21,6 +22,12 @@ type ReplyRow = {
 };
 
 type ReplyNode = ReplyRow & { children: ReplyNode[] };
+
+type VoteTally = {
+  likes: number;
+  dislikes: number;
+  myVote: "Like" | "Dislike" | null;
+};
 
 export default async function ThreadPage({
   params,
@@ -60,6 +67,29 @@ export default async function ThreadPage({
     .where(eq(replies.threadUri, threadUri))
     .orderBy(asc(replies.createdAt))
     .all();
+
+  const voteTargets = [threadUri, ...replyRows.map((r) => r.uri)];
+  const voteRows = db
+    .select()
+    .from(votes)
+    .where(inArray(votes.targetUri, voteTargets))
+    .all();
+  const myVoterUri = user
+    ? new URL(`/users/${user.username}`, origin).href
+    : null;
+  const tallies = new Map<string, VoteTally>();
+  for (const v of voteRows) {
+    const t = tallies.get(v.targetUri) ?? {
+      likes: 0,
+      dislikes: 0,
+      myVote: null,
+    };
+    if (v.kind === "Like") t.likes++;
+    else t.dislikes++;
+    if (v.voterUri === myVoterUri) t.myVote = v.kind;
+    tallies.set(v.targetUri, t);
+  }
+
   const replyTree = buildReplyTree(replyRows, threadUri);
 
   return (
@@ -77,6 +107,13 @@ export default async function ThreadPage({
           <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>{thread.content}</p>
         </div>
       )}
+      <VoteButtons
+        targetUri={threadUri}
+        slug={slug}
+        threadId={idParam}
+        tally={tallies.get(threadUri)}
+        canVote={user != null}
+      />
 
       <h3>Replies</h3>
       {error && <p className="muted">{error}</p>}
@@ -98,9 +135,68 @@ export default async function ThreadPage({
           slug={slug}
           threadId={idParam}
           user={user}
+          tallies={tallies}
         />
       )}
     </>
+  );
+}
+
+function VoteButtons({
+  targetUri,
+  slug,
+  threadId,
+  tally,
+  canVote,
+}: {
+  targetUri: string;
+  slug: string;
+  threadId: string;
+  tally: VoteTally | undefined;
+  canVote: boolean;
+}) {
+  const likes = tally?.likes ?? 0;
+  const dislikes = tally?.dislikes ?? 0;
+  const mine = tally?.myVote ?? null;
+  if (!canVote) {
+    return (
+      <p className="muted" style={{ marginTop: "0.5rem" }}>
+        ▲ {likes} &nbsp; ▼ {dislikes}
+      </p>
+    );
+  }
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "0.5rem",
+        alignItems: "center",
+        marginTop: "0.5rem",
+      }}
+    >
+      <form action={castVote.bind(null, slug, threadId)}>
+        <input type="hidden" name="targetUri" value={targetUri} />
+        <input type="hidden" name="kind" value="Like" />
+        <button
+          type="submit"
+          className={mine === "Like" ? "" : "link-button"}
+          style={{ margin: 0 }}
+        >
+          ▲ {likes}
+        </button>
+      </form>
+      <form action={castVote.bind(null, slug, threadId)}>
+        <input type="hidden" name="targetUri" value={targetUri} />
+        <input type="hidden" name="kind" value="Dislike" />
+        <button
+          type="submit"
+          className={mine === "Dislike" ? "" : "link-button"}
+          style={{ margin: 0 }}
+        >
+          ▼ {dislikes}
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -109,11 +205,13 @@ function ReplyList({
   slug,
   threadId,
   user,
+  tallies,
 }: {
   nodes: ReplyNode[];
   slug: string;
   threadId: string;
   user: Awaited<ReturnType<typeof getCurrentUser>>;
+  tallies: Map<string, VoteTally>;
 }) {
   return (
     <ul className="reply-tree">
@@ -125,6 +223,13 @@ function ReplyList({
               {node.createdAt.toLocaleString("en-US")}
             </p>
             <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>{node.content}</p>
+            <VoteButtons
+              targetUri={node.uri}
+              slug={slug}
+              threadId={threadId}
+              tally={tallies.get(node.uri)}
+              canVote={user != null}
+            />
             {user && (
               <details style={{ marginTop: "0.5rem" }}>
                 <summary className="muted">Reply</summary>
@@ -145,6 +250,7 @@ function ReplyList({
               slug={slug}
               threadId={threadId}
               user={user}
+              tallies={tallies}
             />
           )}
         </li>
@@ -165,7 +271,6 @@ function buildReplyTree(rows: ReplyRow[], threadUri: string): ReplyNode[] {
     else if (node.parentUri == null || node.parentUri === threadUri) {
       roots.push(node);
     } else {
-      // Orphaned reply: its parent didn't land yet. Show at top level.
       roots.push(node);
     }
   }
