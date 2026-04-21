@@ -33,7 +33,7 @@ export default async function RootLayout({
             </ul>
             {user ? (
               <form action={logout} className="session-controls">
-                <span className="muted">@{user.username}</span>
+                <Link href={`/users/${user.username}`}>@{user.username}</Link>
                 <button type="submit" className="link-button">
                   Log out
                 </button>
