@@ -1,5 +1,6 @@
 "use server";
 
+import { Create, isActor, Page, PUBLIC_COLLECTION } from "@fedify/vocab";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { communities, db, threads } from "@/db";
@@ -27,23 +28,56 @@ export async function createThread(
 
   const origin = await currentOrigin();
   const ctx = federation.createContext(origin, undefined);
-  const communityUri = ctx.getActorUri(slug).href;
-  const authorUri = ctx.getActorUri(user.username).href;
+  const communityActorUri = ctx.getActorUri(slug);
+  const communityFollowersUri = ctx.getFollowersUri(slug);
+  const authorUri = ctx.getActorUri(user.username);
+  const published = new Date();
 
   const inserted = db
     .insert(threads)
     .values({
-      uri: "placeholder",
-      communityUri,
-      authorUri,
+      uri: `urn:threadiverse:pending:${Date.now()}`,
+      communityUri: communityActorUri.href,
+      authorUri: authorUri.href,
       title,
       content,
+      createdAt: published,
     })
     .returning({ id: threads.id })
     .get();
 
-  const uri = new URL(`/users/${slug}/threads/${inserted.id}`, origin).href;
-  db.update(threads).set({ uri }).where(eq(threads.id, inserted.id)).run();
+  const threadUri = new URL(`/users/${slug}/threads/${inserted.id}`, origin);
+  db.update(threads)
+    .set({ uri: threadUri.href })
+    .where(eq(threads.id, inserted.id))
+    .run();
+
+  const page = new Page({
+    id: threadUri,
+    name: title,
+    content: content || undefined,
+    attribution: authorUri,
+    audience: communityActorUri,
+    tos: [communityActorUri],
+    ccs: [PUBLIC_COLLECTION, communityFollowersUri],
+  });
+
+  const communityActor = await ctx.lookupObject(communityActorUri);
+  if (!isActor(communityActor)) {
+    redirect(`/users/${slug}?error=Could+not+resolve+community+actor`);
+  }
+
+  await ctx.sendActivity(
+    { identifier: user.username },
+    communityActor,
+    new Create({
+      id: new URL("#create", threadUri),
+      actor: authorUri,
+      object: page,
+      tos: [communityActorUri],
+      ccs: [PUBLIC_COLLECTION, communityFollowersUri],
+    }),
+  );
 
   redirect(`/users/${slug}`);
 }
