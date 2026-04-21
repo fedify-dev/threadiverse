@@ -6,7 +6,7 @@ import {
   importJwk,
   MemoryKvStore,
 } from "@fedify/fedify";
-import { Endpoints, Group, Person } from "@fedify/vocab";
+import { Accept, Endpoints, Follow, Group, Person } from "@fedify/vocab";
 import { and, eq } from "drizzle-orm";
 import { communities, db, follows, keys, users } from "@/db";
 
@@ -138,6 +138,68 @@ federation.setFollowersDispatcher(
   },
 );
 
-federation.setInboxListeners("/users/{identifier}/inbox", "/inbox");
+federation
+  .setInboxListeners("/users/{identifier}/inbox", "/inbox")
+  .on(Follow, async (ctx, follow) => {
+    if (!follow.id || !follow.actorId || !follow.objectId) return;
+    const parsed = ctx.parseUri(follow.objectId);
+    if (parsed?.type !== "actor") return;
+    const identifier = parsed.identifier;
+
+    const community = db
+      .select()
+      .from(communities)
+      .where(eq(communities.slug, identifier))
+      .get();
+    if (!community) return;
+
+    const actor = await follow.getActor(ctx);
+    if (!actor?.id || !actor.inboxId) return;
+
+    db.insert(follows)
+      .values({
+        followerUri: actor.id.href,
+        followerInbox: actor.inboxId.href,
+        followerSharedInbox: actor.endpoints?.sharedInbox?.href ?? null,
+        followedUri: follow.objectId.href,
+        accepted: true,
+      })
+      .onConflictDoUpdate({
+        target: [follows.followerUri, follows.followedUri],
+        set: {
+          followerInbox: actor.inboxId.href,
+          followerSharedInbox: actor.endpoints?.sharedInbox?.href ?? null,
+          accepted: true,
+        },
+      })
+      .run();
+
+    await ctx.sendActivity(
+      { identifier },
+      actor,
+      new Accept({
+        id: new URL(
+          `#accepts/${encodeURIComponent(follow.id.href)}`,
+          follow.objectId,
+        ),
+        actor: follow.objectId,
+        object: follow,
+      }),
+    );
+  })
+  .on(Accept, async (ctx, accept) => {
+    const enclosed = await accept.getObject(ctx);
+    if (!(enclosed instanceof Follow)) return;
+    if (!enclosed.actorId || !enclosed.objectId) return;
+    db.update(follows)
+      .set({ accepted: true })
+      .where(
+        and(
+          eq(follows.followerUri, enclosed.actorId.href),
+          eq(follows.followedUri, enclosed.objectId.href),
+        ),
+      )
+      .run();
+  });
 
 export default federation;
