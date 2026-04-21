@@ -85,3 +85,18 @@ export const follows = sqliteTable(
 );
 
 export type Follow = typeof follows.$inferSelect;
+
+export const threads = sqliteTable("threads", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  uri: text("uri").notNull().unique(),
+  communityUri: text("community_uri").notNull(),
+  authorUri: text("author_uri").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull().default(""),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+export type Thread = typeof threads.$inferSelect;
+export type NewThread = typeof threads.$inferInsert;
