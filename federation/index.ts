@@ -78,6 +78,8 @@ federation
         outbox: ctx.getOutboxUri(identifier),
         endpoints: new Endpoints({ sharedInbox: ctx.getInboxUri() }),
         followers: ctx.getFollowersUri(identifier),
+        featured: new URL(`/users/${identifier}/featured`, ctx.url),
+        attribution: ctx.getCollectionUri("moderators", { identifier }),
         url: new URL(`/users/${identifier}`, ctx.url),
         publicKey: keyPairs[0]?.cryptographicKey,
         assertionMethods: keyPairs.map((k) => k.multikey),
@@ -136,6 +138,29 @@ federation
 
 federation.setOutboxDispatcher(
   "/users/{identifier}/outbox",
+  async (_ctx, _identifier) => ({ items: [] }),
+);
+
+federation.setCollectionDispatcher(
+  "moderators",
+  Person,
+  "/users/{identifier}/moderators",
+  async (ctx, { identifier }) => {
+    const row = db
+      .select({ username: users.username })
+      .from(communities)
+      .innerJoin(users, eq(users.id, communities.creatorId))
+      .where(eq(communities.slug, identifier))
+      .get();
+    if (!row) return null;
+    return {
+      items: [new Person({ id: ctx.getActorUri(row.username) })],
+    };
+  },
+);
+
+federation.setFeaturedDispatcher(
+  "/users/{identifier}/featured",
   async (_ctx, _identifier) => ({ items: [] }),
 );
 
