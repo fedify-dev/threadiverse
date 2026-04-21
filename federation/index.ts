@@ -270,18 +270,31 @@ federation
     );
   })
   .on(Accept, async (ctx, accept) => {
-    const enclosed = await accept.getObject(ctx);
-    if (!(enclosed instanceof Follow)) return;
-    if (!enclosed.actorId || !enclosed.objectId) return;
-    db.update(follows)
-      .set({ accepted: true })
-      .where(
-        and(
-          eq(follows.followerUri, enclosed.actorId.href),
-          eq(follows.followedUri, enclosed.objectId.href),
-        ),
-      )
-      .run();
+    if (!accept.actorId) return;
+    const followedUri = accept.actorId.href;
+
+    let followerUri: string | null = null;
+    const enclosed = await accept.getObject(ctx).catch(() => null);
+    if (enclosed instanceof Follow && enclosed.actorId) {
+      followerUri = enclosed.actorId.href;
+    }
+
+    if (followerUri) {
+      db.update(follows)
+        .set({ accepted: true })
+        .where(
+          and(
+            eq(follows.followerUri, followerUri),
+            eq(follows.followedUri, followedUri),
+          ),
+        )
+        .run();
+    } else {
+      db.update(follows)
+        .set({ accepted: true })
+        .where(eq(follows.followedUri, followedUri))
+        .run();
+    }
   })
   .on(Undo, async (ctx, undo) => {
     const enclosed = await undo.getObject(ctx);

@@ -58,8 +58,8 @@ export async function createThread(
     content: content || undefined,
     attribution: authorUri,
     audience: communityActorUri,
-    tos: [communityActorUri],
-    ccs: [PUBLIC_COLLECTION, communityFollowersUri],
+    tos: [PUBLIC_COLLECTION],
+    ccs: [communityActorUri, communityFollowersUri],
   });
 
   await ctx.sendActivity(
@@ -73,8 +73,8 @@ export async function createThread(
       id: new URL("#create", threadUri),
       actor: authorUri,
       object: page,
-      tos: [communityActorUri],
-      ccs: [PUBLIC_COLLECTION, communityFollowersUri],
+      tos: [PUBLIC_COLLECTION],
+      ccs: [communityActorUri, communityFollowersUri],
     }),
   );
 
