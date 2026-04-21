@@ -2,6 +2,7 @@ import {
   createFederation,
   exportJwk,
   generateCryptoKeyPair,
+  type InboxContext,
   InProcessMessageQueue,
   importJwk,
   MemoryKvStore,
@@ -11,16 +12,27 @@ import {
   Activity,
   Announce,
   Create,
+  Dislike,
   Endpoints,
   Follow,
   Group,
+  Like,
   Note,
   Page,
   Person,
   PUBLIC_COLLECTION,
 } from "@fedify/vocab";
 import { and, eq } from "drizzle-orm";
-import { communities, db, follows, keys, replies, threads, users } from "@/db";
+import {
+  communities,
+  db,
+  follows,
+  keys,
+  replies,
+  threads,
+  users,
+  votes,
+} from "@/db";
 
 const federation = createFederation({
   kv: new MemoryKvStore(),
@@ -302,6 +314,76 @@ federation
     if (object instanceof Activity) {
       await ctx.routeActivity(ctx.recipient, object);
     }
+  })
+  .on(Like, async (ctx, like) => {
+    await handleVote(ctx, like, "Like");
+  })
+  .on(Dislike, async (ctx, dislike) => {
+    await handleVote(ctx, dislike, "Dislike");
   });
+
+async function handleVote(
+  ctx: InboxContext<unknown>,
+  activity: Like | Dislike,
+  kind: "Like" | "Dislike",
+): Promise<void> {
+  if (!activity.id || !activity.actorId || !activity.objectId) return;
+  const targetUri = activity.objectId.href;
+  const communityUri = activity.audienceId ?? activity.toIds[0] ?? null;
+  if (!communityUri) return;
+
+  const targetThread = db
+    .select({ uri: threads.uri })
+    .from(threads)
+    .where(eq(threads.uri, targetUri))
+    .get();
+  const targetReply = targetThread
+    ? null
+    : db
+        .select({ uri: replies.uri })
+        .from(replies)
+        .where(eq(replies.uri, targetUri))
+        .get();
+  if (!targetThread && !targetReply) return;
+
+  db.insert(votes)
+    .values({
+      uri: activity.id.href,
+      voterUri: activity.actorId.href,
+      targetUri,
+      kind,
+      communityUri: communityUri.href,
+    })
+    .onConflictDoUpdate({
+      target: [votes.voterUri, votes.targetUri],
+      set: { kind, uri: activity.id.href },
+    })
+    .run();
+
+  const parsed = ctx.parseUri(communityUri);
+  if (parsed?.type !== "actor") return;
+  const localCommunity = db
+    .select({ slug: communities.slug })
+    .from(communities)
+    .where(eq(communities.slug, parsed.identifier))
+    .get();
+  if (!localCommunity) return;
+
+  await ctx.sendActivity(
+    { identifier: parsed.identifier },
+    "followers",
+    new Announce({
+      id: new URL(
+        `#announce/${encodeURIComponent(activity.id.href)}`,
+        communityUri,
+      ),
+      actor: communityUri,
+      object: activity,
+      tos: [ctx.getFollowersUri(parsed.identifier)],
+      ccs: [PUBLIC_COLLECTION],
+    }),
+    { preferSharedInbox: true },
+  );
+}
 
 export default federation;
