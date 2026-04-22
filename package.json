@@ -12,15 +12,15 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@fedify/fedify": "2.1.7",
-    "@fedify/next": "2.1.7",
-    "@fedify/vocab": "2.1.7",
+    "@fedify/fedify": "^2.1.8",
+    "@fedify/next": "^2.1.8",
+    "@fedify/vocab": "^2.1.8",
     "@logtape/logtape": "^2.0.5",
     "better-sqlite3": "^12.9.0",
     "drizzle-orm": "^0.45.2",
-    "next": "^15.5.15",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "next": "^16.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "x-forwarded-fetch": "^0.2.0"
   },
   "devDependencies": {
