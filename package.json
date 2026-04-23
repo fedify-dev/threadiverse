@@ -12,9 +12,9 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@fedify/fedify": "^2.1.8",
-    "@fedify/next": "^2.1.8",
-    "@fedify/vocab": "^2.1.8",
+    "@fedify/fedify": "^2.1.10",
+    "@fedify/next": "^2.1.10",
+    "@fedify/vocab": "^2.1.10",
     "@logtape/logtape": "^2.0.5",
     "better-sqlite3": "^12.9.0",
     "drizzle-orm": "^0.45.2",

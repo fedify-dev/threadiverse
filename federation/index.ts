@@ -2,7 +2,6 @@ import {
   createFederation,
   exportJwk,
   generateCryptoKeyPair,
-  getDocumentLoader,
   type InboxContext,
   InProcessMessageQueue,
   importJwk,
@@ -35,30 +34,10 @@ import {
   users,
   votes,
 } from "@/db";
-import lemmyContext from "./lemmy-context.json" with { type: "json" };
-
-const BUNDLED_CONTEXTS: Record<string, unknown> = {
-  "https://join-lemmy.org/context.json": lemmyContext,
-};
-
-const documentLoaderFactory: Parameters<
-  typeof createFederation
->[0]["documentLoaderFactory"] = (options) => {
-  const inner = getDocumentLoader(options);
-  return async (url) => {
-    const bundled = BUNDLED_CONTEXTS[url];
-    if (bundled != null) {
-      return { contextUrl: null, document: bundled, documentUrl: url };
-    }
-    return await inner(url);
-  };
-};
 
 const federation = createFederation({
   kv: new MemoryKvStore(),
   queue: new InProcessMessageQueue(),
-  documentLoaderFactory,
-  contextLoaderFactory: documentLoaderFactory,
 });
 
 federation
